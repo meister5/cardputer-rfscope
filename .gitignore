@@ -1,0 +1,6 @@
+build/
+dist/
+test/unit_tests
+*.o
+*.elf
+*.map
