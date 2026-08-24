@@ -70,4 +70,38 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.bin
+          fail_on_unmatched_files: true
           generate_release_notes: true
+
+  sync-root-binaries:
+    name: refresh root binaries
+    needs: [unit-tests, firmware, release]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Check out main, not the tag: the root images track the newest release,
+      # and the tag ref is detached and cannot be pushed to.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: CardputerRFScope-binaries
+          path: dist
+      - name: Copy the release images to the repo root
+        run: cp dist/*.bin .
+      # [skip ci] keeps this push from starting another build. Without it every
+      # release would trigger a second, pointless run of the whole workflow.
+      - name: Commit if they changed
+        run: |
+          if git diff --quiet -- ./*.bin; then
+            echo "root binaries already match ${{ github.ref_name }}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ./*.bin
+          git commit -m "Refresh root binaries for ${{ github.ref_name }} [skip ci]"
+          git push origin main
