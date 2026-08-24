@@ -66,6 +66,10 @@ private:
     void keyMeter(const KeyEvent& e);
 
     void beginConnectTo(int apIndex);
+    // Rebuilds the sorted AP order and the saved-credential flags, but only
+    // when the sweeper has actually published a new scan.
+    void refreshApView();
+    void refreshBleOrder();
     void sampleMeter(uint32_t now);
     void pushWaterfallRow();
 
@@ -89,6 +93,14 @@ private:
     Settings _settings;
 
     std::vector<KeyEvent> _events;
+
+    // Cached derived views. Sorting and NVS lookups are far too expensive to
+    // redo on every frame.
+    std::vector<int> _apOrder;
+    std::vector<uint8_t> _apSaved;  // parallel to _sweeper.aps()
+    uint32_t _apViewGen = 0;
+    bool _apViewValid   = false;
+    std::vector<int> _bleOrder;
 
     // --- navigation ------------------------------------------------------
     Screen _screen = Screen::Menu;

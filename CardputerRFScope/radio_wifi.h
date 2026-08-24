@@ -108,6 +108,13 @@ public:
         return _scanState != ScanState::Idle;
     }
 
+    // Bumped each time the AP list is replaced. The UI caches sorting and
+    // saved-credential lookups against this instead of redoing them per frame.
+    uint32_t apGeneration() const
+    {
+        return _apGeneration;
+    }
+
     // Total frames seen since begin(), for the "is anything happening" readout.
     uint32_t totalFrames() const
     {
@@ -139,6 +146,7 @@ private:
     uint32_t _lastApScanMs = 0;
     uint32_t _sweepCount   = 0;
     uint32_t _totalFrames  = 0;
+    uint32_t _apGeneration = 0;
     bool _sweepTick        = false;
     ScanState _scanState   = ScanState::Idle;
 };

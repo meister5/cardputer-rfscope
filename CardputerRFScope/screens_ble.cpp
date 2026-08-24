@@ -45,6 +45,20 @@ void bleLabel(const BleDevice& d, char* out, size_t n)
 
 }  // namespace
 
+void App::refreshBleOrder()
+{
+    const std::vector<BleDevice>& devs = _ble.devices();
+    _bleOrder.clear();
+    _bleOrder.reserve(devs.size());
+    for (size_t i = 0; i < devs.size(); i++) _bleOrder.push_back(static_cast<int>(i));
+    // BLE RSSI moves constantly, so unlike the AP list this is re-sorted every
+    // frame -- but into a vector that keeps its capacity, so it does not churn
+    // the heap.
+    std::sort(_bleOrder.begin(), _bleOrder.end(), [&devs](int a, int b) {
+        return devs[static_cast<size_t>(a)].rssi > devs[static_cast<size_t>(b)].rssi;
+    });
+}
+
 // -------------------------------------------------------------- ble list --
 
 void App::drawBleList()
@@ -70,13 +84,7 @@ void App::drawBleList()
     }
 
     // Strongest first, so the thing you are walking toward stays near the top.
-    std::vector<int> order;
-    order.reserve(_ble.devices().size());
-    for (size_t i = 0; i < _ble.devices().size(); i++) order.push_back(static_cast<int>(i));
-    std::sort(order.begin(), order.end(), [this](int a, int b) {
-        return _ble.devices()[static_cast<size_t>(a)].rssi >
-               _ble.devices()[static_cast<size_t>(b)].rssi;
-    });
+    const std::vector<int>& order = _bleOrder;
 
     if (order.empty()) {
         g.setTextColor(t.textDim, t.bg);
@@ -133,13 +141,7 @@ void App::keyBleList(const KeyEvent& e)
 {
     if (!isActionable(e)) return;
 
-    std::vector<int> order;
-    order.reserve(_ble.devices().size());
-    for (size_t i = 0; i < _ble.devices().size(); i++) order.push_back(static_cast<int>(i));
-    std::sort(order.begin(), order.end(), [this](int a, int b) {
-        return _ble.devices()[static_cast<size_t>(a)].rssi >
-               _ble.devices()[static_cast<size_t>(b)].rssi;
-    });
+    const std::vector<int>& order = _bleOrder;
 
     switch (navFor(e)) {
         case Nav::Up:

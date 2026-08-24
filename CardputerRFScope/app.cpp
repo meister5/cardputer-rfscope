@@ -101,6 +101,7 @@ void App::applyRadioForScreen(Screen s)
         case Screen::Networks:
             _sweeper.stopSweep();
             _sweeper.requestApScan();
+            _apViewValid = false;  // re-check saved credentials on entry
             break;
 
         case Screen::Meter:
@@ -165,6 +166,9 @@ void App::loop()
     }
 
     if (_sweeper.consumeSweepTick()) pushWaterfallRow();
+
+    refreshApView();
+    if (_screen == Screen::BleList) refreshBleOrder();
 
     if (_screen == Screen::Meter) sampleMeter(now);
     if (_screen == Screen::BleTracker) sampleBleTracker(now);

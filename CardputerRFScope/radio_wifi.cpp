@@ -233,6 +233,7 @@ void WifiSweeper::serviceApScan(uint32_t now)
             }
 
             WiFi.scanDelete();
+            _apGeneration++;
             _lastApScanMs = now;
             _scanState    = ScanState::Idle;
             if (_sweeping) {

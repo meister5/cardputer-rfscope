@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app.h"
+#include "storage.h"
 #include "ui_theme.h"
 #include "ui_widgets.h"
 
@@ -26,16 +27,6 @@ int slotX(int chIndex)
     return 1 + chIndex * kSlotW;
 }
 
-// Sorted view over the AP list, strongest first.
-void sortedApIndices(const std::vector<ApInfo>& aps, std::vector<int>& out)
-{
-    out.clear();
-    out.reserve(aps.size());
-    for (size_t i = 0; i < aps.size(); i++) out.push_back(static_cast<int>(i));
-    std::sort(out.begin(), out.end(),
-              [&aps](int a, int b) { return aps[a].rssi > aps[b].rssi; });
-}
-
 void ssidLabel(const ApInfo& ap, char* out, size_t n)
 {
     if (ap.hidden || ap.ssid[0] == '\0') {
@@ -46,6 +37,30 @@ void ssidLabel(const ApInfo& ap, char* out, size_t n)
 }
 
 }  // namespace
+
+void App::refreshApView()
+{
+    const uint32_t gen = _sweeper.apGeneration();
+    if (_apViewValid && gen == _apViewGen) return;
+
+    const std::vector<ApInfo>& aps = _sweeper.aps();
+
+    _apOrder.clear();
+    _apOrder.reserve(aps.size());
+    for (size_t i = 0; i < aps.size(); i++) _apOrder.push_back(static_cast<int>(i));
+    std::sort(_apOrder.begin(), _apOrder.end(),
+              [&aps](int a, int b) { return aps[static_cast<size_t>(a)].rssi >
+                                            aps[static_cast<size_t>(b)].rssi; });
+
+    // Each of these opens NVS, so it happens once per scan and never per frame.
+    _apSaved.assign(aps.size(), 0);
+    for (size_t i = 0; i < aps.size(); i++) {
+        _apSaved[i] = CredentialStore::has(aps[i].ssid) ? 1 : 0;
+    }
+
+    _apViewGen   = gen;
+    _apViewValid = true;
+}
 
 // --------------------------------------------------------------- spectrum --
 
@@ -214,12 +229,9 @@ void App::drawChannelDetail()
     }
 
     // APs whose own channel is this one.
-    std::vector<int> order;
-    sortedApIndices(_sweeper.aps(), order);
-
     int y     = BODY_Y + 23;
     int shown = 0;
-    for (int i : order) {
+    for (int i : _apOrder) {
         const ApInfo& ap = _sweeper.aps()[static_cast<size_t>(i)];
         if (ap.channel != _chCursor) continue;
         if (shown++ < _detailTop) continue;
@@ -284,8 +296,7 @@ void App::drawNetworks()
              static_cast<unsigned>(_sweeper.aps().size()));
     ui::drawHeader("SELECT NETWORK", right);
 
-    std::vector<int> order;
-    sortedApIndices(_sweeper.aps(), order);
+    const std::vector<int>& order = _apOrder;
 
     if (order.empty()) {
         g.setFont(&fonts::Font0);
@@ -322,7 +333,9 @@ void App::drawNetworks()
         g.drawString(name, 4, y + kRowH / 2 - 1);
 
         char meta[20];
-        snprintf(meta, sizeof(meta), "%s%s c%d", CredentialStore::has(ap.ssid) ? "* " : "",
+        const size_t apIdx = static_cast<size_t>(order[static_cast<size_t>(i)]);
+        snprintf(meta, sizeof(meta), "%s%s c%d",
+                 (apIdx < _apSaved.size() && _apSaved[apIdx]) ? "* " : "",
                  authModeName(ap.auth), ap.channel);
         g.setTextColor(on ? t.accentText : t.textDim, on ? t.accent : t.bg);
         g.setTextDatum(middle_right);
@@ -352,8 +365,7 @@ void App::keyNetworks(const KeyEvent& e)
         return;
     }
 
-    std::vector<int> order;
-    sortedApIndices(_sweeper.aps(), order);
+    const std::vector<int>& order = _apOrder;
 
     switch (navFor(e)) {
         case Nav::Up:
@@ -475,6 +487,7 @@ void App::keyPassword(const KeyEvent& e)
     }
     if (e.code == KEY_ENTER) {
         _net.connect(_pwSsid, _pwBuf, true);
+        _apViewValid = false;  // the saved-credential marker may change
         _trace.clear();
         _peak.reset();
         _smooth.reset();
