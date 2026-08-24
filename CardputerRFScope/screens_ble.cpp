@@ -53,9 +53,13 @@ void App::refreshBleOrder()
     for (size_t i = 0; i < devs.size(); i++) _bleOrder.push_back(static_cast<int>(i));
     // BLE RSSI moves constantly, so unlike the AP list this is re-sorted every
     // frame -- but into a vector that keeps its capacity, so it does not churn
-    // the heap.
-    std::sort(_bleOrder.begin(), _bleOrder.end(), [&devs](int a, int b) {
-        return devs[static_cast<size_t>(a)].rssi > devs[static_cast<size_t>(b)].rssi;
+    // the heap. Sorting on the smoothed value rather than the raw one keeps
+    // rows from swapping places on every advertisement.
+    auto strength = [](const BleDevice& d) {
+        return d.smooth.valid() ? d.smooth.value() : static_cast<float>(d.rssi);
+    };
+    std::sort(_bleOrder.begin(), _bleOrder.end(), [&devs, &strength](int a, int b) {
+        return strength(devs[static_cast<size_t>(a)]) > strength(devs[static_cast<size_t>(b)]);
     });
 }
 

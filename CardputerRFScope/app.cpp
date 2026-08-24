@@ -77,6 +77,10 @@ void App::applySettings()
 
 void App::go(Screen s)
 {
+    if (_settingsDirty) {
+        _settings.save();
+        _settingsDirty = false;
+    }
     _screen = s;
     _input.resync();  // a key held across a transition must not leak through
     _audio.silence();
@@ -382,7 +386,6 @@ void App::keySettings(const KeyEvent& e)
             _setSel = (_setSel + 1) % kSettingCount;
             return;
         case Nav::Back:
-            _settings.save();
             go(Screen::Menu);
             return;
         case Nav::Left:
@@ -437,7 +440,10 @@ void App::keySettings(const KeyEvent& e)
     }
 
     applySettings();
-    _settings.save();
+    // Deliberately NOT saved here: adjusting a value auto-repeats while a key
+    // is held, and writing NVS at the repeat rate would wear the flash for no
+    // reason. Settings are persisted on leaving the screen.
+    _settingsDirty = true;
 }
 
 // ---------------------------------------------------------- diagnostics ----

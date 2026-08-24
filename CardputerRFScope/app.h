@@ -91,6 +91,7 @@ private:
     NetManager _net;
     SignalAudio _audio;
     Settings _settings;
+    bool _settingsDirty = false;
 
     std::vector<KeyEvent> _events;
 
@@ -112,6 +113,7 @@ private:
     int _bleTop    = 0;
     int _chCursor  = 6;
     int _detailTop = 0;
+    int _detailCount = 0;  // APs on the inspected channel, for scroll clamping
     bool _capsLock = false;
 
     // --- password entry --------------------------------------------------

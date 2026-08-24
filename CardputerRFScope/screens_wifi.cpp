@@ -229,6 +229,14 @@ void App::drawChannelDetail()
     }
 
     // APs whose own channel is this one.
+    int matching = 0;
+    for (int i : _apOrder) {
+        if (_sweeper.aps()[static_cast<size_t>(i)].channel == _chCursor) matching++;
+    }
+    _detailCount = matching;
+    if (_detailTop > matching - 1) _detailTop = matching - 1;
+    if (_detailTop < 0) _detailTop = 0;
+
     int y     = BODY_Y + 23;
     int shown = 0;
     for (int i : _apOrder) {
@@ -258,7 +266,7 @@ void App::drawChannelDetail()
         y += 10;
     }
 
-    if (shown == 0) {
+    if (matching == 0) {
         g.setTextColor(t.textDim, t.bg);
         g.drawString(_sweeper.apScanInFlight() ? "scanning..." : "no beaconing APs here", 4, y);
     }
@@ -274,7 +282,7 @@ void App::keyChannelDetail(const KeyEvent& e)
             if (_detailTop > 0) _detailTop--;
             break;
         case Nav::Down:
-            _detailTop++;
+            if (_detailTop + 1 < _detailCount) _detailTop++;
             break;
         case Nav::Back:
             go(Screen::Spectrum);
@@ -568,7 +576,10 @@ void App::drawMeter()
     const int live  = have ? _trace.newest() : DBM_FLOOR;
     const int peak  = _peak.valid() ? static_cast<int>(_peak.value()) : DBM_FLOOR;
 
-    ui::drawGauge(50, 74, 34, live, have, peak, _peak.valid());
+    // The needle is damped like a real analogue meter; the number beside it
+    // stays raw so nothing is hidden from you.
+    const int needle = _smooth.valid() ? static_cast<int>(_smooth.value()) : live;
+    ui::drawGauge(50, 74, 34, needle, have, peak, _peak.valid());
 
     // Big reading.
     char buf[24];
