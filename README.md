@@ -129,7 +129,13 @@ tools/package.sh
 ### M5Launcher
 
 Launcher installs application binaries into an OTA app partition, so use the
-**app** binary:
+**app** binary. A prebuilt copy sits at the repo root, refreshed at each
+release, so you do not have to build anything:
+
+<https://raw.githubusercontent.com/meister5/cardputer-rfscope/main/CardputerRFScope-app.bin>
+
+That URL is directly downloadable, which is what an `OTA > Favorites` entry
+needs. To install from SD instead:
 
 1. Copy `CardputerRFScope-app.bin` to a FAT32 SD card.
 2. In Launcher, open `SD`, select the file, choose `Install`.
