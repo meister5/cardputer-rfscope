@@ -3,6 +3,9 @@
 
 using namespace rfscope;
 
+// The keyboard reports ENTER as 0x0D; key_events.h is board-agnostic.
+static constexpr uint8_t KEY_ENTER_CODE = 0x0D;
+
 static std::vector<KeyEvent> step(KeyEventGen& g, std::vector<uint8_t> held, uint32_t now,
                                   KeyMods mods = KeyMods{})
 {
@@ -135,4 +138,41 @@ TEST(resync_forgets_every_held_key_without_emitting_events)
     g.resync();
     auto ev = step(g, {}, 10);
     CHECK_EQ(ev.size(), 0);
+}
+
+TEST(resync_does_not_re_press_a_key_that_is_still_held)
+{
+    // The screen-change case: ENTER is handled, the app switches screen and
+    // calls resync() while the user still has ENTER physically down. The next
+    // poll must stay silent -- otherwise the new screen sees a fresh press and
+    // acts on a key the user never pressed a second time.
+    KeyEventGen g;
+    step(g, {KEY_ENTER_CODE}, 0);
+    g.resync();
+    auto ev = step(g, {KEY_ENTER_CODE}, 2);
+    CHECK_EQ(ev.size(), 0);
+}
+
+TEST(a_key_held_through_resync_works_again_after_a_real_release)
+{
+    KeyEventGen g;
+    step(g, {KEY_ENTER_CODE}, 0);
+    g.resync();
+    step(g, {KEY_ENTER_CODE}, 2);   // still down: silent
+    step(g, {}, 50);                // released
+    auto ev = step(g, {KEY_ENTER_CODE}, 60);
+    CHECK_EQ(ev.size(), 1);
+    CHECK(ev[0].action == KeyAction::Press);
+}
+
+TEST(a_key_held_through_resync_never_auto_repeats)
+{
+    // Suppression must outlast the repeat delay, or the held key just starts
+    // firing repeats into the new screen instead of a press.
+    KeyEventGen g;
+    step(g, {KEY_ENTER_CODE}, 0);
+    g.resync();
+    for (uint32_t t = 2; t < 3000; t += 20) {
+        CHECK_EQ(step(g, {KEY_ENTER_CODE}, t).size(), 0);
+    }
 }

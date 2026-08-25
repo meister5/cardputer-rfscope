@@ -23,7 +23,15 @@ void NetManager::begin()
 
 void NetManager::connect(const char* ssid, const char* pass, bool save)
 {
-    if (!ssid || !*ssid) return;
+    // A hidden AP arrives from the scan with no SSID, and there is nothing to
+    // associate to. Report it: returning quietly here left the caller on a
+    // meter that claimed no network had been picked at all.
+    if (!ssid || !*ssid) {
+        _ssid[0] = '\0';
+        _state   = State::Failed;
+        _error   = "hidden network - no SSID";
+        return;
+    }
 
     strncpy(_ssid, ssid, sizeof(_ssid) - 1);
     _ssid[sizeof(_ssid) - 1] = '\0';

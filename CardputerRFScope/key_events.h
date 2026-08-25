@@ -61,11 +61,15 @@ public:
         return _cfg;
     }
 
-    // Drop all held-key state without emitting events. Used when changing
-    // screens so a key held during a transition cannot leak into the new one.
+    // Used when changing screens so a key held during a transition cannot leak
+    // into the new one. Clearing the held set would do the opposite: the key is
+    // still physically down, so the very next poll would not find it and would
+    // report a brand-new press to the screen we just moved to. Suppress instead
+    // -- nothing is emitted for these keys until the driver reports them
+    // released, which is the same mechanism the stuck-key watchdog uses.
     void resync()
     {
-        _held.clear();
+        for (auto& h : _held) h.suppressed = true;
     }
 
     void update(const std::vector<uint8_t>& pressed, const KeyMods& mods, uint32_t nowMs,

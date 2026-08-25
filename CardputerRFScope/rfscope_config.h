@@ -6,7 +6,7 @@
 namespace rfscope {
 
 constexpr const char* APP_NAME    = "RFSCOPE";
-constexpr const char* APP_VERSION = "0.1.0";
+constexpr const char* APP_VERSION = "1.0.1";
 
 // The Cardputer / Cardputer ADV panel in landscape.
 constexpr int SCREEN_W = 240;
