@@ -75,6 +75,14 @@ public:
         return _apScanEnabled;
     }
 
+    // Scanning and associating cannot share one radio: a scan walks every
+    // channel for well over a second, which aborts an in-flight connect. The
+    // app holds scans off until the link resolves.
+    void setScanInhibited(bool on)
+    {
+        _scanInhibited = on;
+    }
+
     // Drive from the UI loop. Non-blocking.
     void loop();
 
@@ -141,6 +149,7 @@ private:
     bool _promiscuous   = false;
     bool _apScanEnabled = true;
     bool _forceScan     = false;
+    bool _scanInhibited = false;
 
     uint32_t _lastHopMs    = 0;
     uint32_t _lastApScanMs = 0;

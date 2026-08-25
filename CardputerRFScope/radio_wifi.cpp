@@ -171,6 +171,12 @@ void WifiSweeper::serviceApScan(uint32_t now)
 {
     switch (_scanState) {
         case ScanState::Idle:
+            if (_scanInhibited) {
+                // Drop any held request rather than firing it mid-handshake
+                // the moment the hold lifts.
+                _forceScan = false;
+                return;
+            }
             if (_forceScan) {
                 _forceScan = false;
                 _scanState = ScanState::Requested;

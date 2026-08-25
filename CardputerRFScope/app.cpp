@@ -103,6 +103,9 @@ void App::applyRadioForScreen(Screen s)
             break;
 
         case Screen::Networks:
+            // Otherwise the pending connect keeps scans inhibited and the
+            // picker sits empty until it times out.
+            if (_net.state() == NetManager::State::Connecting) _net.disconnect();
             _sweeper.stopSweep();
             _sweeper.requestApScan();
             _apViewValid = false;  // re-check saved credentials on entry
@@ -151,6 +154,10 @@ void App::loop()
         if (isActionable(e)) _lastKeyCode = e.code;
         handleKey(e);
     }
+
+    // Must be set before the sweeper runs: a scan started here would take the
+    // radio off-channel and kill the association in progress.
+    _sweeper.setScanInhibited(_net.state() == NetManager::State::Connecting);
 
     _sweeper.loop();
     _net.loop();

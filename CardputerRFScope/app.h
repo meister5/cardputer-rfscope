@@ -69,6 +69,9 @@ private:
     // Rebuilds the sorted AP order and the saved-credential flags, but only
     // when the sweeper has actually published a new scan.
     void refreshApView();
+    // The picker cursor is a slot in an RSSI-sorted list, so a rescan can move
+    // a different AP under it. Latch which BSSID the cursor actually means.
+    void rememberNetSel();
     void refreshBleOrder();
     void sampleMeter(uint32_t now);
     void pushWaterfallRow();
@@ -109,6 +112,8 @@ private:
     int _setSel    = 0;
     int _netSel    = 0;
     int _netTop    = 0;
+    uint8_t _netSelBssid[6] = {0};
+    bool _netSelValid       = false;
     int _bleSel    = 0;
     int _bleTop    = 0;
     int _chCursor  = 6;

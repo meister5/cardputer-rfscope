@@ -52,6 +52,26 @@ void App::refreshApView()
               [&aps](int a, int b) { return aps[static_cast<size_t>(a)].rssi >
                                             aps[static_cast<size_t>(b)].rssi; });
 
+    // The order is by RSSI, so a rescan reshuffles rows. Keep the cursor on
+    // the network the user aimed at rather than on whatever now holds its slot
+    // -- picking a different AP than the highlighted one is how you end up
+    // joining something you never chose.
+    if (_netSelValid) {
+        int found = -1;
+        for (size_t i = 0; i < _apOrder.size(); i++) {
+            const size_t idx = static_cast<size_t>(_apOrder[i]);
+            if (memcmp(aps[idx].bssid, _netSelBssid, 6) == 0) {
+                found = static_cast<int>(i);
+                break;
+            }
+        }
+        if (found >= 0) _netSel = found;
+    }
+    if (_netSel >= static_cast<int>(_apOrder.size())) {
+        _netSel = static_cast<int>(_apOrder.size()) - 1;
+    }
+    if (_netSel < 0) _netSel = 0;
+
     // Each of these opens NVS, so it happens once per scan and never per frame.
     _apSaved.assign(aps.size(), 0);
     for (size_t i = 0; i < aps.size(); i++) {
@@ -60,6 +80,20 @@ void App::refreshApView()
 
     _apViewGen   = gen;
     _apViewValid = true;
+    rememberNetSel();
+}
+
+void App::rememberNetSel()
+{
+    _netSelValid = false;
+    if (_netSel < 0 || _netSel >= static_cast<int>(_apOrder.size())) return;
+
+    const std::vector<ApInfo>& aps = _sweeper.aps();
+    const size_t idx = static_cast<size_t>(_apOrder[static_cast<size_t>(_netSel)]);
+    if (idx >= aps.size()) return;
+
+    memcpy(_netSelBssid, aps[idx].bssid, 6);
+    _netSelValid = true;
 }
 
 // --------------------------------------------------------------- spectrum --
@@ -378,9 +412,11 @@ void App::keyNetworks(const KeyEvent& e)
     switch (navFor(e)) {
         case Nav::Up:
             if (_netSel > 0) _netSel--;
+            rememberNetSel();
             break;
         case Nav::Down:
             if (_netSel + 1 < static_cast<int>(order.size())) _netSel++;
+            rememberNetSel();
             break;
         case Nav::Select:
             if (!order.empty()) beginConnectTo(order[static_cast<size_t>(_netSel)]);
