@@ -1,21 +1,21 @@
 # RFScope
 
-A 2.4 GHz WiFi and BLE spectrum analyser, channel scanner and RSSI meter for the
-**M5Stack Cardputer ADV** (and the original Cardputer).
+A 2.4 GHz WiFi and BLE spectrum analyser, channel scanner and RSSI meter I wrote
+for the **M5Stack Cardputer ADV** (it runs on the original Cardputer too).
 
 Pick a network, type the password, and watch the signal strength live on an
 analogue-style gauge with a scrolling trace, or sweep the whole band and see
-which channels are busy.
+which channels are busy. I use it on my own ADV to survey rooms.
 
 ---
 
 ## What it measures
 
 The ESP32-S3 has no RF spectrum-sweep peripheral, and there is no way to read
-raw energy at an arbitrary frequency on it. This is therefore not a swept-tuned
-analyser, whatever other firmware for this chip may claim.
+raw energy at an arbitrary frequency on it. So I did not build a swept-tuned
+analyser, and I would not trust firmware for this chip that says it is one.
 
-What it does measure:
+What I actually measure:
 
 | Claim | How it is measured | Resolution |
 |---|---|---|
@@ -26,7 +26,7 @@ What it does measure:
 | BLE device RSSI | NimBLE observer, per advertisement | 1 dBm |
 | BLE band activity | Advertisement rate on channels 37/38/39 | 3 channels only |
 
-The limits:
+The limits I am working inside:
 
 - **2.4 GHz only.** The radio has no 5 GHz or 6 GHz front end.
 - **BLE only, no Bluetooth Classic.** The ESP32-S3 has no Classic radio at all.
@@ -38,8 +38,8 @@ The limits:
 - **Sweeping and metering cannot run at once.** Associating with an AP pins the
   radio to that AP's channel, so while the meter is connected the sniffer can
   only watch that one channel.
-- **WiFi and BLE share one radio.** The Band view runs both and says
-  `COEX - reduced duty cycle` on screen, because both sides lose airtime.
+- **WiFi and BLE share one radio.** The Band view runs both, and I put
+  `COEX - reduced duty cycle` on screen because both sides lose airtime.
 
 ## Screens
 
@@ -50,9 +50,9 @@ The limits:
 - **Connect**: network picker sorted by strength, showing auth mode, channel and
   a `*` for networks whose password is already saved. `ENTER` to join.
 - **Meter**: arc gauge with needle and peak-hold marker, large dBm readout, link
-  quality %, min/avg/max/jitter, and a scrolling RSSI trace. Optional
-  geiger-style audio whose pitch and click rate track signal strength, so you
-  can survey a room without watching the screen.
+  quality %, min/avg/max/jitter, and a scrolling RSSI trace. I added optional
+  geiger-style audio whose pitch and click rate track signal strength, so I can
+  walk a room without watching the screen.
 - **BLE Scan**: live device list with RSSI bars, ageing out stale entries.
 - **BLE Tracker**: the same gauge and trace for one chosen device, as a hot/cold
   finder for a tag or beacon.
@@ -82,8 +82,8 @@ instead, with or without `Fn`; both are accepted.
 
 ## Cardputer ADV notes
 
-The ADV is not a drop-in for the original Cardputer, and this firmware handles
-the differences explicitly:
+The ADV is not a drop-in for the original Cardputer, so I handle the
+differences explicitly:
 
 - **Board detection is at runtime.** M5GFX probes G8/G9 to tell an ADV from an
   original, so the same FQBN (`m5stack:esp32:m5stack_cardputer`) is correct for
@@ -91,12 +91,12 @@ the differences explicitly:
 - **The keyboard is a TCA8418 I²C controller, not a 74HC138 matrix.** The M5
   driver reads it as a FIFO of press/release events and processes only one event
   per `update()` call, whereas the original rescans the whole matrix every time.
-  Two consequences are handled in `input.cpp` and `key_events.h`:
-  1. The FIFO is drained several times per frame so fast typing cannot queue up.
-  2. The driver's held-key list is stateful, so a dropped release event would
-     leave a key held forever. A watchdog force-releases any key held past a
-     timeout and refuses to re-press it until the driver actually stops
-     reporting it. This logic is unit-tested on the host.
+  I deal with two consequences in `input.cpp` and `key_events.h`:
+  1. I drain the FIFO several times per frame so fast typing cannot queue up.
+  2. The driver's held-key list is stateful, so a dropped release event leaves a
+     key held forever. My watchdog force-releases any key held past a timeout
+     and refuses to re-press it until the driver actually stops reporting it. I
+     unit-test that logic on the host.
 - Audio goes through an **ES8311 codec** on the ADV rather than the original's
   NS4168; M5Unified handles the enable path once the board is detected.
 
@@ -159,14 +159,14 @@ esptool --chip esp32s3 --port /dev/ttyACM0 write-flash 0x0 \
 
 ### Getting back to Launcher
 
-RFScope does not touch the OTA boot partition, deliberately, so it cannot brick
-a Launcher install. Return to Launcher the way Launcher documents for your
+I deliberately never touch the OTA boot partition, so RFScope cannot brick a
+Launcher install. Return to Launcher the way Launcher documents for your
 device.
 
 ## Tests
 
-The signal statistics, channel-plan arithmetic and keyboard event logic are pure
-C++ with no Arduino dependencies, so they are unit-tested on the host:
+I kept the signal statistics, channel-plan arithmetic and keyboard event logic
+as pure C++ with no Arduino dependencies, so I can unit-test them on the host:
 
 ```bash
 make -C test
