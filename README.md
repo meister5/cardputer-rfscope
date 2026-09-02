@@ -5,7 +5,7 @@ for the **M5Stack Cardputer ADV** (it runs on the original Cardputer too).
 
 Pick a network, type the password, and watch the signal strength live on an
 analogue-style gauge with a scrolling trace, or sweep the whole band and see
-which channels are busy. I use it on my own ADV to survey rooms.
+which channels are busy.
 
 ---
 
