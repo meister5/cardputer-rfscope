@@ -1,205 +1,71 @@
 # RFScope
 
-A 2.4 GHz WiFi and BLE spectrum analyser, channel scanner and RSSI meter I wrote
-for the **M5Stack Cardputer ADV** (it runs on the original Cardputer too).
+A 2.4 GHz WiFi and BLE channel scanner and RSSI meter for the M5Stack Cardputer ADV (it also runs on the original Cardputer).
 
-Pick a network, type the password, and watch the signal strength live on an
-analogue-style gauge with a scrolling trace, or sweep the whole band and see
-which channels are busy.
+## Features
 
----
+- Spectrum: per-channel occupancy and signal level over a scrolling waterfall, with an AP list per channel
+- Connect to a network and watch link RSSI on a gauge with a scrolling trace
+- Optional geiger-style audio whose pitch and click rate follow signal strength
+- BLE scan with a live device list, plus a hot/cold tracker for one device
+- Band view: WiFi channels and BLE advertising channels on one frequency axis
+- Diagnostics screen (board, keyboard driver, heap, frame rate) and persistent settings
 
 ## What it measures
 
-The ESP32-S3 has no RF spectrum-sweep peripheral, and there is no way to read
-raw energy at an arbitrary frequency on it. So I did not build a swept-tuned
-analyser, and I would not trust firmware for this chip that says it is one.
+The ESP32-S3 cannot read raw RF energy at an arbitrary frequency, so this is not a swept-tuned spectrum analyser. Occupancy comes from counting frames in monitor mode per channel, and signal level from the RSSI of those frames, at 14-channel resolution.
 
-What I actually measure:
+- 2.4 GHz only, BLE only (no Bluetooth Classic), advertising channels 37/38/39 only.
+- Channel 14 is shown only if the radio accepts it.
+- Sweeping and metering cannot run at once: while connected, the sniffer watches only the AP's channel.
+- WiFi and BLE share one radio, so the Band view runs at reduced duty cycle.
 
-| Claim | How it is measured | Resolution |
-|---|---|---|
-| Per-channel occupancy | Monitor mode, counting **every** frame the PHY delivers during a dwell window | 14 channels, not MHz |
-| Per-channel signal level | Peak/mean/floor of `rx_ctrl.rssi` over that window | 1 dBm |
-| Access points per channel | Periodic active scan overlaid on the sweep | n/a |
-| Link RSSI | `esp_wifi_sta_get_ap_info` while associated | 1 dBm, ~25 Hz |
-| BLE device RSSI | NimBLE observer, per advertisement | 1 dBm |
-| BLE band activity | Advertisement rate on channels 37/38/39 | 3 channels only |
+More detail in [docs/DESIGN.md](docs/DESIGN.md).
 
-The limits I am working inside:
+## Hardware
 
-- **2.4 GHz only.** The radio has no 5 GHz or 6 GHz front end.
-- **BLE only, no Bluetooth Classic.** The ESP32-S3 has no Classic radio at all.
-- **BLE sees only the advertising channels** (37/38/39 at 2402/2426/2480 MHz).
-  The 37 data channels are frequency-hopping between connected peers and are not
-  observable with a scanner.
-- **Channel 14** is used only where regulations allow it. The firmware asks the
-  radio at boot and hides the channel if it is refused.
-- **Sweeping and metering cannot run at once.** Associating with an AP pins the
-  radio to that AP's channel, so while the meter is connected the sniffer can
-  only watch that one channel.
-- **WiFi and BLE share one radio.** The Band view runs both, and I put
-  `COEX - reduced duty cycle` on screen because both sides lose airtime.
+M5Stack Cardputer ADV or Cardputer v1.1. Board detection happens at runtime, so one build covers both.
 
-## Screens
+## Install
 
-- **Spectrum**: per-channel bars over a scrolling waterfall. The wide dim bar is
-  traffic volume, the narrow bright bar is signal strength, the yellow tick is
-  the strongest beaconing AP. `,` `/` move the cursor, `ENTER` drills into a
-  channel's AP list.
-- **Connect**: network picker sorted by strength, showing auth mode, channel and
-  a `*` for networks whose password is already saved. `ENTER` to join.
-- **Meter**: arc gauge with needle and peak-hold marker, large dBm readout, link
-  quality %, min/avg/max/jitter, and a scrolling RSSI trace. I added optional
-  geiger-style audio whose pitch and click rate track signal strength, so I can
-  walk a room without watching the screen.
-- **BLE Scan**: live device list with RSSI bars, ageing out stale entries.
-- **BLE Tracker**: the same gauge and trace for one chosen device, as a hot/cold
-  finder for a tag or beacon.
-- **Band**: WiFi channels and BLE advertising channels plotted together on a
-  true frequency axis.
-- **Diagnostics**: board detected, keyboard driver in use, display mode, heap,
-  frame rate, and a key echo. Check this first on a new device.
-- **Settings**: theme, sweep dwell, audio, brightness, AP overlay, local sniff,
-  forget saved networks. Persisted to NVS.
+Prebuilt images are in the repo root.
 
-## Controls
+- M5Launcher: copy `CardputerRFScope-app.bin` to a FAT32 SD card and choose Install, or use `https://raw.githubusercontent.com/meister5/cardputer-rfscope/main/CardputerRFScope-app.bin` as an `OTA > Favorites` entry.
+- M5Burner or esptool: use `CardputerRFScope-merged.bin`.
 
-The Cardputer keyboard has no arrow keys. The `;` `.` `,` `/` cluster is used
-instead, with or without `Fn`; both are accepted.
+```bash
+esptool --chip esp32s3 --port /dev/ttyACM0 write-flash 0x0 CardputerRFScope-merged.bin
+```
+
+## Usage
+
+The keyboard has no arrow keys, so `;` `.` `,` `/` are used, with or without Fn.
 
 | Key | Action |
-|---|---|
+| --- | --- |
 | `;` / `.` | up / down |
-| `,` / `/` | left / right |
-| `ENTER` | select |
-| `BKSP` | back |
-| `` ` `` | back / cancel (and the way out of Diagnostics) |
+| `,` / `/` | left / right (move cursor on Spectrum) |
+| `ENTER` | select, or open a channel's AP list |
+| `BKSP` or `` ` `` | back / cancel |
 | `TAB` | show/hide password |
-| `Fn`+`TAB` | caps lock, in the password field |
-| `A` | toggle audio, on the meter screens |
-| `R` | rescan, on the network picker |
+| `A` | toggle audio (meter screens) |
+| `R` | rescan (network picker) |
 
-## Cardputer ADV notes
+Use RFScope only on networks you are authorised to survey. Monitor mode reads frame metadata (RSSI, length, channel) and does not decrypt or store traffic.
 
-The ADV is not a drop-in for the original Cardputer, so I handle the
-differences explicitly:
-
-- **Board detection is at runtime.** M5GFX probes G8/G9 to tell an ADV from an
-  original, so the same FQBN (`m5stack:esp32:m5stack_cardputer`) is correct for
-  both. There is no ADV-specific board in the M5Stack core.
-- **The keyboard is a TCA8418 I²C controller, not a 74HC138 matrix.** The M5
-  driver reads it as a FIFO of press/release events and processes only one event
-  per `update()` call, whereas the original rescans the whole matrix every time.
-  I deal with two consequences in `input.cpp` and `key_events.h`:
-  1. I drain the FIFO several times per frame so fast typing cannot queue up.
-  2. The driver's held-key list is stateful, so a dropped release event leaves a
-     key held forever. My watchdog force-releases any key held past a timeout
-     and refuses to re-press it until the driver actually stops reporting it. I
-     unit-test that logic on the host.
-- Audio goes through an **ES8311 codec** on the ADV rather than the original's
-  NS4168; M5Unified handles the enable path once the board is detected.
-
-## Building
+## Build
 
 Requires `arduino-cli` with the M5Stack ESP32 core.
 
 ```bash
-arduino-cli core install m5stack:esp32
+arduino-cli core install m5stack:esp32 \
+  --additional-urls https://static-cdn.m5stack.com/resource/arduino/package_m5stack_index.json
 arduino-cli lib install M5Cardputer NimBLE-Arduino
-
-# compile
-arduino-cli compile \
-  --fqbn "m5stack:esp32:m5stack_cardputer:PartitionScheme=default_8MB,PSRAM=disabled" \
-  CardputerRFScope
-
-# or build both release binaries at once
-tools/package.sh
+tools/package.sh   # writes dist/CardputerRFScope-app.bin and dist/CardputerRFScope-merged.bin
 ```
 
-`tools/package.sh` writes:
+To compile only: `arduino-cli compile --fqbn "m5stack:esp32:m5stack_cardputer:PartitionScheme=default_8MB,PSRAM=disabled" CardputerRFScope`. Host unit tests: `make -C test`.
 
-| File | Use |
-|---|---|
-| `dist/CardputerRFScope-app.bin` | **M5Launcher**: copy to SD, or upload via WebUI/OTA |
-| `dist/CardputerRFScope-merged.bin` | **M5Burner** custom firmware, or `esptool` at offset `0x0` |
-
-## Installing
-
-### M5Launcher
-
-Launcher installs application binaries into an OTA app partition, so use the
-**app** binary. A prebuilt copy sits at the repo root, refreshed at each
-release, so you do not have to build anything:
-
-<https://raw.githubusercontent.com/meister5/cardputer-rfscope/main/CardputerRFScope-app.bin>
-
-That URL is directly downloadable, which is what an `OTA > Favorites` entry
-needs. To install from SD instead:
-
-1. Copy `CardputerRFScope-app.bin` to a FAT32 SD card.
-2. In Launcher, open `SD`, select the file, choose `Install`.
-
-It also works through `WUI` (browser upload) or as an `OTA > Favorites` entry
-pointing at a release asset URL. The build is kept at around 1.3 MB, well inside
-a standard OTA slot, and `tools/package.sh` fails the build if it ever outgrows
-one.
-
-### M5Burner
-
-Use the **merged** binary as a custom firmware upload. It contains the
-bootloader, partition table and app.
-
-### esptool
-
-```bash
-esptool --chip esp32s3 --port /dev/ttyACM0 write-flash 0x0 \
-  dist/CardputerRFScope-merged.bin
-```
-
-### Getting back to Launcher
-
-I deliberately never touch the OTA boot partition, so RFScope cannot brick a
-Launcher install. Return to Launcher the way Launcher documents for your
-device.
-
-## Tests
-
-I kept the signal statistics, channel-plan arithmetic and keyboard event logic
-as pure C++ with no Arduino dependencies, so I can unit-test them on the host:
-
-```bash
-make -C test
-```
-
-Everything else is covered by a clean compile, in CI on every push.
-
-## Layout
-
-```
-CardputerRFScope/
-  CardputerRFScope.ino    entry point
-  app.{h,cpp}             screen state machine, menu, settings, diagnostics
-  screens_wifi.cpp        spectrum, channel detail, network picker, password, meter
-  screens_ble.cpp         BLE list, tracker, band view
-  radio_wifi.{h,cpp}      channel-hopping monitor-mode sweep engine
-  radio_ble.{h,cpp}       NimBLE observer
-  net_manager.{h,cpp}     association lifecycle
-  input.{h,cpp}           Cardputer/ADV keyboard glue
-  key_events.h            pure edge/repeat/stuck-key logic          (tested)
-  signal_stats.h          RSSI ring, EWMA, peak hold, quality curve (tested)
-  channel_map.h           2.4 GHz channel plan and overlap          (tested)
-  storage.{h,cpp}         NVS settings and saved credentials
-  ui_theme.{h,cpp}        retro and heat-map palettes
-  ui_widgets.{h,cpp}      canvas, gauge, trace, bars
-  audio_tone.{h,cpp}      geiger-style signal audio
-test/                     host unit tests
-tools/package.sh          release build
-```
-
-## Licence
+## License
 
 MIT. See [LICENSE](LICENSE).
-
-Use it on networks you are authorised to survey. Monitor mode observes frame
-metadata (RSSI, length, channel) only; it does not decrypt or store traffic.
